@@ -29,7 +29,6 @@ const Dashboard = () => {
   const initializeChart = (data) => {
     const nationalUsers = data.filter((row) => row.country_name === "India");
     const internationalUsers = data.filter((row) => row.country_name !== "India");
-
     setChartData({
       labels: ["National", "International"],
       datasets: [
@@ -37,6 +36,7 @@ const Dashboard = () => {
           label: "Users",
           data: [nationalUsers.length, internationalUsers.length],
           backgroundColor: ["#0A5678", "#3B9EA0"],
+          barThickness: 120,
         },
       ],
     });
@@ -49,14 +49,12 @@ const Dashboard = () => {
     const filteredData = isNational
       ? originalData.filter((row) => row.country_name === "India")
       : originalData.filter((row) => row.country_name !== "India");
-
     const govUsers = filteredData.filter(
       (row) => typeof row.email === "string" && row.email.toLowerCase().includes("gov")
     );
     const nonGovUsers = filteredData.filter(
       (row) => typeof row.email !== "string" || !row.email.toLowerCase().includes("gov")
     );
-
     setFilterData(filteredData);
     setChartData({
       labels: ["Gov", "Non-Gov"],
@@ -65,6 +63,7 @@ const Dashboard = () => {
           label: "Users",
           data: [govUsers.length, nonGovUsers.length],
           backgroundColor: ["#FFC107", "#FF5722"],
+          barThickness: 120,
         },
       ],
     });
@@ -80,47 +79,65 @@ const Dashboard = () => {
         : typeof row.email === "string" && !row.email.toLowerCase().includes("gov")
     );
 
-    const gsiUsers = filteredData.filter(
-      (row) => typeof row.email === "string" && row.email.toLowerCase().includes("gsi")
-    );
-    const amdUsers = filteredData.filter(
-      (row) => typeof row.email === "string" && row.email.toLowerCase().includes("amd")
-    );
-    const otherUsers = filteredData.filter(
-      (row) =>
-        typeof row.email === "string" &&
-        !row.email.toLowerCase().includes("gsi") &&
-        !row.email.toLowerCase().includes("amd")
-    );
+    if (category === "Non-Gov") {
+      
+      const otherUsers = filteredData.filter(
+        (row) =>
+          typeof row.email === "string" &&
+          !row.email.toLowerCase().includes("gsi") &&
+          !row.email.toLowerCase().includes("amd")
+      );
 
-    // Debugging logs
-    console.log("Filtered Data:", filteredData);
-    console.log("GSI Users:", gsiUsers);
-    console.log("AMD Users:", amdUsers);
-    console.log("Other Users:", otherUsers);
+      setChartData({
+        labels: ["Other"],
+        datasets: [
+          {
+            label: "Users",
+            data: [otherUsers.length || 0],
+            backgroundColor: ["#03A9F4"],
+            barThickness: 120,
+          },
+        ],
+      });
+    } else {
+      
+      const gsiUsers = filteredData.filter(
+        (row) => typeof row.email === "string" && row.email.toLowerCase().includes("gsi")
+      );
+      const amdUsers = filteredData.filter(
+        (row) => typeof row.email === "string" && row.email.toLowerCase().includes("amd")
+      );
+      const otherUsers = filteredData.filter(
+        (row) =>
+          typeof row.email === "string" &&
+          !row.email.toLowerCase().includes("gsi") &&
+          !row.email.toLowerCase().includes("amd")
+      );
 
-    setChartData({
-      labels: ["GSI", "AMD", "Other"],
-      datasets: [
-        {
-          label: "Users",
-          data: [
-            gsiUsers.length || 0, // Ensure it shows 0 if no users
-            amdUsers.length || 0, // Ensure it shows 0 if no users
-            otherUsers.length || 0 // Ensure it shows 0 if no users
-          ],
-          backgroundColor: ["#FF9800", "#8BC34A", "#03A9F4"],
-        },
-      ],
-    });
+      setChartData({
+        labels: ["GSI", "AMD", "Other"],
+        datasets: [
+          {
+            label: "Users",
+            data: [
+              gsiUsers .length || 0,
+              amdUsers.length || 0,
+              otherUsers.length || 0,
+            ],
+            backgroundColor: ["#4CAF50", "#FF9800", "#9C27B0"],
+            barThickness: 120,
+          },
+        ],
+      });
+    }
+
     setCurrentLevel("gsiAmd");
- };
+  };
 
   const handleBarClick = (event, elements) => {
     if (elements.length > 0) {
       const clickedIndex = elements[0].index;
       const clickedLabel = chartData.labels[clickedIndex];
-
       if (currentLevel === "main") {
         drillDownToGovNonGov(clickedLabel);
       } else if (currentLevel === "govNonGov") {
@@ -157,7 +174,6 @@ const Dashboard = () => {
       >
         <h2 style={{ margin: 0 }}>National/International Users</h2>
       </div>
-
       <div
         style={{
           backgroundColor: "#FFFFFF",
@@ -200,7 +216,6 @@ const Dashboard = () => {
             <p>Loading...</p>
           )}
         </div>
-
         {currentLevel !== "main" && (
           <div style={{ textAlign: "center", marginTop: "20px" }}>
             <button
