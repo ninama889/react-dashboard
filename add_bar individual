@@ -1,0 +1,225 @@
+import React, { useState, useEffect } from "react";
+import * as XLSX from "xlsx";
+import { Bar } from "react-chartjs-2";
+import "chart.js/auto";
+
+const Dashboard = () => {
+  const [chartData, setChartData] = useState({});
+  const [originalData, setOriginalData] = useState([]);
+  const [chartStates, setChartStates] = useState({
+    National: { level: "main", labels: [], data: [] },
+    International: { level: "main", labels: [], data: [] },
+  });
+
+  useEffect(() => {
+    fetch("/Login_ngdr Manojsir.xlsx")
+      .then((response) => response.arrayBuffer())
+      .then((dataBuffer) => {
+        const workbook = XLSX.read(dataBuffer, { type: "array" });
+        const sheetName = workbook.SheetNames[0];
+        const sheet = workbook.Sheets[sheetName];
+        const data = XLSX.utils.sheet_to_json(sheet);
+        setOriginalData(data);
+        initializeChart(data);
+      })
+      .catch((error) => {
+        console.error("Error loading the Excel file:", error);
+      });
+  }, []);
+
+  const initializeChart = (data) => {
+    const nationalUsers = data.filter((row) => row.country_name === "India");
+    const internationalUsers = data.filter((row) => row.country_name !== "India");
+
+    setChartData({
+      labels: ["National", "International"],
+      datasets: [
+        {
+          label: "Users",
+          data: [nationalUsers.length, internationalUsers.length],
+          backgroundColor: ["#0A5678", "#3B9EA0"],
+          barThickness: 120,
+        },
+      ],
+    });
+
+    setChartStates({
+      National: {
+        level: "main",
+        labels: ["National"],
+        data: [nationalUsers.length],
+      },
+      International: {
+        level: "main",
+        labels: ["International"],
+        data: [internationalUsers.length],
+      },
+    });
+  };
+
+  const drillDown = (category) => {
+    const data =
+      category === "National"
+        ? originalData.filter((row) => row.country_name === "India")
+        : originalData.filter((row) => row.country_name !== "India");
+
+    const currentState = chartStates[category];
+
+    if (currentState.level === "main") {
+      const govUsers = data.filter(
+        (row) => typeof row.email === "string" && row.email.toLowerCase().includes("gov")
+      );
+      const nonGovUsers = data.filter(
+        (row) => typeof row.email !== "string" || !row.email.toLowerCase().includes("gov")
+      );
+
+      setChartStates((prev) => ({
+        ...prev,
+        [category]: {
+          level: "govNonGov",
+          labels: ["Gov", "Non-Gov"],
+          data: [govUsers.length, nonGovUsers.length],
+        },
+      }));
+    } else if (currentState.level === "govNonGov") {
+      const govUsers = data.filter(
+        (row) => typeof row.email === "string" && row.email.toLowerCase().includes("gov")
+      );
+      const gsiUsers = govUsers.filter((row) =>
+        row.email.toLowerCase().includes("gsi")
+      );
+      const amdUsers = govUsers.filter((row) =>
+        row.email.toLowerCase().includes("amd")
+      );
+      const others = govUsers.filter(
+        (row) =>
+          !row.email.toLowerCase().includes("gsi") &&
+          !row.email.toLowerCase().includes("amd")
+      );
+
+      setChartStates((prev) => ({
+        ...prev,
+        [category]: {
+          level: "gsiAmd",
+          labels: ["GSI", "AMD", "Others"],
+          data: [gsiUsers.length, amdUsers.length, others.length],
+        },
+      }));
+    }
+  };
+
+  const handleBarClick = (event, elements) => {
+    if (elements.length > 0) {
+      const clickedIndex = elements[0].index;
+      const clickedLabel = chartData.labels[clickedIndex];
+      drillDown(clickedLabel);
+    }
+  };
+
+  const handleBackClick = (category) => {
+    const currentState = chartStates[category];
+
+    if (currentState.level === "gsiAmd") {
+      setChartStates((prev) => ({
+        ...prev,
+        [category]: {
+          level: "govNonGov",
+          labels: ["Gov", "Non-Gov"],
+          data: prev[category].data.slice(0, 2),
+        },
+      }));
+    } else if (currentState.level === "govNonGov") {
+      setChartStates((prev) => ({
+        ...prev,
+        [category]: {
+          level: "main",
+          labels: [category],
+          data: [prev[category].data.reduce((a) => a)],
+        },
+      }));
+    }
+  };
+
+  const combineChartData = () => {
+    const combinedLabels = [
+      ...chartStates.National.labels,
+      ...chartStates.International.labels,
+    ];
+    const combinedData = [
+      ...chartStates.National.data,
+      ...chartStates.International.data,
+    ];
+    const combinedColors = [
+      ...Array(chartStates.National.labels.length).fill("#0A5678"),
+      ...Array(chartStates.International.labels.length).fill("#3B9EA0"),
+    ];
+
+    return {
+      labels: combinedLabels,
+      datasets: [
+        {
+          label: "Users",
+          data: combinedData,
+          backgroundColor: combinedColors,
+          barThickness: 120,
+        },
+      ],
+    };
+  };
+
+  return (
+    <div style={{ fontFamily: "Arial, sans-serif", minHeight: "100vh", padding: "20px" }}>
+      <div style={{ textAlign: "center", marginBottom: "20px" }}>
+        <h2>National/International Users</h2>
+      </div>
+
+      <div style={{ position: "relative", height: "300px" }}>
+        <Bar
+          data={combineChartData()}
+          options={{
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { display: true, position: "top" },
+            },
+            onClick: handleBarClick,
+            scales: {
+              x: { stacked: true },
+              y: { stacked: true, beginAtZero: true },
+            },
+          }}
+        />
+
+        {["National", "International"].map(
+          (category) =>
+            chartStates[category].level !== "main" && (
+              <div
+                style={{
+                  position: "absolute",
+                  top: "10px",
+                  right: "10px",
+                }}
+                key={category}
+              >
+                <button
+                  style={{
+                    backgroundColor: "#FF5733",
+                    color: "#FFFFFF",
+                    padding: "5px 10px",
+                    fontSize: "14px",
+                    border: "none",
+                    borderRadius: "5px",
+                    cursor: "pointer",
+                  }}
+                  onClick={() => handleBackClick(category)}
+                >
+                  Back
+                </button>
+              </div>
+            )
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default Dashboard;
